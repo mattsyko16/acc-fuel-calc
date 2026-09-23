@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e12">
+<title>DACC Fuel Calculator</title>
+<style>
+:root{
+  --bg:#0b0e12; --panel:#12171e; --panel2:#171e27; --ink:#f5f7fa; --muted:#9aa7b5;
+  --line:#29323d; --accent:#e43d30; --green:#36c275; --amber:#f3b742; --blue:#4ca3ff;
+  --shadow:0 14px 34px rgba(0,0,0,.28);
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{
+  margin:0; color:var(--ink); background:
+    radial-gradient(circle at 85% -10%, rgba(228,61,48,.16), transparent 34rem),
+    var(--bg);
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  min-height:100vh; padding:env(safe-area-inset-top) 14px env(safe-area-inset-bottom);
+}
+.wrap{max-width:760px;margin:0 auto;padding:18px 0 32px}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 2px 14px}
+.brand h1{font-size:1.25rem;letter-spacing:.12em;margin:0;font-weight:900}
+.brand h1 span{color:var(--accent)}
+.brand .tag{font-size:.72rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.card{
+  background:linear-gradient(180deg,var(--panel2),var(--panel));
+  border:1px solid var(--line); border-radius:18px; padding:14px; margin:0 0 12px; box-shadow:var(--shadow)
+}
+.mode{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mode button,.quick button,.actions button{
+  appearance:none;border:1px solid var(--line);background:#0f141b;color:var(--muted);
+  min-height:46px;border-radius:12px;font-weight:800;font-size:.95rem;cursor:pointer
+}
+.mode button.active{background:var(--accent);color:white;border-color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.grid.one{grid-template-columns:1fr}
+.field{min-width:0}
+label{display:block;font-size:.78rem;color:var(--muted);font-weight:750;margin:0 0 5px}
+input{
+  width:100%; min-height:48px; border:1px solid var(--line); border-radius:12px;
+  padding:10px 12px; background:#0d1218; color:var(--ink); font:inherit; font-size:1.04rem;
+  outline:none
+}
+input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(76,163,255,.14)}
+.inline-time{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hint{font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.3}
+.section-title{font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:#c5ced8;margin:2px 0 10px;font-weight:900}
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:8px}
+.quick button{min-height:38px;font-size:.8rem}
+.results{padding:0;overflow:hidden}
+.hero{padding:17px 16px;background:linear-gradient(135deg,rgba(54,194,117,.16),rgba(76,163,255,.08));border-bottom:1px solid var(--line)}
+.hero .eyebrow{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:850}
+.hero .value{font-size:2.9rem;font-weight:950;line-height:1;margin:5px 0 4px}
+.hero .value small{font-size:1.1rem;color:#dfe7ee}
+.hero .sub{font-size:.9rem;color:#c7d1db}
+.metrics{display:grid;grid-template-columns:repeat(2,1fr)}
+.metric{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.metric:nth-child(even){border-right:0}
+.metric .k{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:800}
+.metric .v{font-size:1.35rem;font-weight:900;margin-top:3px}
+.metric .v.green{color:var(--green)} .metric .v.amber{color:var(--amber)} .metric .v.blue{color:var(--blue)}
+.notice{margin:12px 14px 14px;padding:11px 12px;border-radius:12px;font-size:.84rem;line-height:1.4;border:1px solid var(--line);background:#0d1218;color:#d4dde6}
+.notice.warn{border-color:rgba(243,183,66,.5);background:rgba(243,183,66,.09);color:#ffe0a0}
+.notice.bad{border-color:rgba(228,61,48,.55);background:rgba(228,61,48,.10);color:#ffb8b2}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.actions button.primary{background:var(--accent);border-color:var(--accent);color:white}
+.actions button.secondary{color:#dce4eb}
+.footer{text-align:center;color:#677482;font-size:.7rem;padding:7px 8px}
+.hidden{display:none!important}
+@media (max-width:520px){
+  .wrap{padding-top:12px}
+  .grid{grid-template-columns:1fr 1fr}
+  .hero .value{font-size:2.55rem}
+  .metric .v{font-size:1.2rem}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand">
+    <div>
+      <h1>DACC <span>FUEL</span> ENGINEER</h1>
+      <div class="tag">Standalone driver calculator</div>
+    </div>
+    <div class="tag">ACC</div>
+  </header>
+
+  <section class="card">
+    <div class="section-title">Calculate by</div>
+    <div class="mode">
+      <button id="modeTime" class="active" type="button">⏱ Time remaining</button>
+      <button id="modeLaps" type="button">🏁 Laps remaining</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">Race / stint</div>
+
+    <div id="timeFields">
+      <div class="grid">
+        <div class="field">
+          <label>Hours remaining</label>
+          <input id="hours" type="number" inputmode="numeric" min="0" step="1" value="0">
+        </div>
+        <div class="field">
+          <label>Minutes remaining</label>
+          <input id="minutes" type="number" inputmode="decimal" min="0" step="1" value="47">
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:10px">
+        <div class="field">
+          <label>Average lap — min</label>
+          <input id="lapMin" type="number" inputmode="numeric" min="0" step="1" value="1">
+        </div>
+        <div class="field">
+          <label>Average lap — sec</label>
+          <input id="lapSec" type="number" inputmode="decimal" min="0" max="59.999" step="0.1" value="30">
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:10px">
+        <label>Pit loss before rejoining (seconds)</label>
+        <input id="pitLoss" type="number" inputmode="decimal" min="0" step="1" value="0">
+        <div class="hint">Optional. Subtracted from remaining race time before estimating laps.</div>
+      </div>
+
+      <div class="quick">
+        <button type="button" data-minutes="-5">−5m</button>
+        <button type="button" data-minutes="5">+5m</button>
+        <button type="button" data-minutes="15">+15m</button>
+        <button type="button" data-minutes="30">+30m</button>
+      </div>
+    </div>
+
+    <div id="lapFields" class="hidden">
+      <div class="field">
+        <label>Laps remaining</label>
+        <input id="laps" type="number" inputmode="numeric" min="0" step="1" value="32">
+      </div>
+      <div class="quick">
+        <button type="button" data-laps="-1">−1</button>
+        <button type="button" data-laps="1">+1</button>
+        <button type="button" data-laps="5">+5</button>
+        <button type="button" data-laps="10">+10</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">Fuel</div>
+    <div class="grid">
+      <div class="field">
+        <label>Fuel per lap (L)</label>
+        <input id="fuelPerLap" type="number" inputmode="decimal" min="0.01" step="0.01" value="2.24">
+      </div>
+      <div class="field">
+        <label>Safety margin (laps)</label>
+        <input id="marginLaps" type="number" inputmode="decimal" min="0" step="0.5" value="2">
+      </div>
+      <div class="field">
+        <label>Current fuel (L)</label>
+        <input id="currentFuel" type="number" inputmode="decimal" min="0" step="0.1" value="0">
+      </div>
+      <div class="field">
+        <label>Tank capacity (L)</label>
+        <input id="tank" type="number" inputmode="decimal" min="1" step="1" value="120">
+      </div>
+    </div>
+  </section>
+
+  <section class="card results" aria-live="polite">
+    <div class="hero">
+      <div class="eyebrow">Recommended fuel to start / leave pits with</div>
+      <div class="value"><span id="recommended">—</span> <small>L</small></div>
+      <div class="sub" id="heroSub">Enter values above</div>
+    </div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="k">Fuel to add</div>
+        <div class="v green"><span id="toAdd">—</span> L</div>
+      </div>
+      <div class="metric">
+        <div class="k">Expected laps</div>
+        <div class="v"><span id="expectedLaps">—</span></div>
+      </div>
+      <div class="metric">
+        <div class="k">Minimum fuel</div>
+        <div class="v"><span id="minimum">—</span> L</div>
+      </div>
+      <div class="metric">
+        <div class="k">Finish reserve</div>
+        <div class="v blue"><span id="reserve">—</span> L</div>
+      </div>
+      <div class="metric">
+        <div class="k">Current fuel range</div>
+        <div class="v"><span id="currentRange">—</span> laps</div>
+      </div>
+      <div class="metric">
+        <div class="k">Full tank range</div>
+        <div class="v"><span id="tankRange">—</span> laps</div>
+      </div>
+    </div>
+    <div id="notice" class="notice">The safety margin is added in laps, matching the Race Engineer approach.</div>
+  </section>
+
+  <section class="card">
+    <div class="actions">
+      <button id="copyBtn" class="primary" type="button">Copy fuel call</button>
+      <button id="resetBtn" class="secondary" type="button">Reset defaults</button>
+    </div>
+  </section>
+
+  <div class="footer">Runs entirely in this browser · settings saved locally · no login or backend required</div>
+</div>
+
+<script>
+const DEFAULTS = {
+  mode:"time", hours:0, minutes:47, lapMin:1, lapSec:30, pitLoss:0,
+  laps:32, fuelPerLap:2.24, marginLaps:2, currentFuel:0, tank:120
+};
+let mode = "time";
+const $ = id => document.getElementById(id);
+const num = id => Number($(id).value);
+const clamp = (v,min,max=Infinity) => Math.min(max,Math.max(min,v));
+const ceil1 = v => Math.ceil((v - 1e-9) * 10) / 10; // never underfuel due to display rounding
+const fmt1 = v => Number.isFinite(v) ? v.toFixed(1) : "—";
+const fmtLap = v => Number.isFinite(v) ? String(Math.max(0,Math.ceil(v))) : "—";
+
+function save(){
+  const s = {
+    mode,
+    hours:num("hours"), minutes:num("minutes"), lapMin:num("lapMin"), lapSec:num("lapSec"),
+    pitLoss:num("pitLoss"), laps:num("laps"), fuelPerLap:num("fuelPerLap"),
+    marginLaps:num("marginLaps"), currentFuel:num("currentFuel"), tank:num("tank")
+  };
+  localStorage.setItem("daccFuelCalc", JSON.stringify(s));
+}
+function load(){
+  let s = DEFAULTS;
+  try{s={...DEFAULTS,...JSON.parse(localStorage.getItem("daccFuelCalc")||"{}")}}catch{}
+  mode = s.mode==="laps" ? "laps":"time";
+  Object.keys(DEFAULTS).forEach(k=>{
+    if(k==="mode") return;
+    if($(k)) $(k).value = s[k];
+  });
+  setMode(mode,false);
+}
+function reset(){
+  localStorage.removeItem("daccFuelCalc");
+  mode=DEFAULTS.mode;
+  Object.keys(DEFAULTS).forEach(k=>{
+    if(k==="mode") return;
+    if($(k)) $(k).value=DEFAULTS[k];
+  });
+  setMode("time",false);
+  calculate();
+}
+function setMode(next, doSave=true){
+  mode=next;
+  $("modeTime").classList.toggle("active",mode==="time");
+  $("modeLaps").classList.toggle("active",mode==="laps");
+  $("timeFields").classList.toggle("hidden",mode!=="time");
+  $("lapFields").classList.toggle("hidden",mode!=="laps");
+  if(doSave) save();
+  calculate();
+}
+function calculate(){
+  const fpl = num("fuelPerLap");
+  const margin = clamp(num("marginLaps")||0,0);
+  const current = clamp(num("currentFuel")||0,0);
+  const tank = num("tank");
+
+  let expected = NaN;
+  let detail = "";
+
+  if(mode==="laps"){
+    expected = Math.max(0, Math.ceil(num("laps")||0));
+    detail = `${expected} race/stint laps + ${margin} margin`;
+  } else {
+    const remainingSec = Math.max(0,(num("hours")||0)*3600 + (num("minutes")||0)*60);
+    const lapTimeSec = Math.max(0,(num("lapMin")||0)*60 + (num("lapSec")||0));
+    const pitLoss = Math.max(0,num("pitLoss")||0);
+    const usableSec = Math.max(0,remainingSec-pitLoss);
+    if(lapTimeSec>0){
+      expected = Math.ceil((usableSec-1e-9)/lapTimeSec);
+      detail = `${expected} laps estimated from ${(usableSec/60).toFixed(1)} min on track`;
+    }
+  }
+
+  const valid = Number.isFinite(expected) && fpl>0 && tank>0;
+  if(!valid){
+    ["recommended","toAdd","expectedLaps","minimum","reserve","currentRange","tankRange"].forEach(id=>$(id).textContent="—");
+    $("heroSub").textContent="Check fuel/lap, lap time and tank size.";
+    $("notice").className="notice bad";
+    $("notice").textContent="Enter valid positive values before using this fuel call.";
+    return;
+  }
+
+  const minimumRaw = expected*fpl;
+  const recommendedRaw = (expected+margin)*fpl;
+  // Display/load values round upward to 0.1 L to avoid silently underfueling.
+  const minimum = ceil1(minimumRaw);
+  const recommended = ceil1(recommendedRaw);
+  const toAdd = ceil1(Math.max(0,recommended-current));
+  const reserve = Math.max(0,recommended-minimumRaw);
+  const currentRange = Math.floor((current+1e-9)/fpl);
+  const tankRange = Math.floor((tank+1e-9)/fpl);
+
+  $("recommended").textContent=fmt1(recommended);
+  $("toAdd").textContent=fmt1(toAdd);
+  $("expectedLaps").textContent=expected;
+  $("minimum").textContent=fmt1(minimum);
+  $("reserve").textContent=fmt1(reserve);
+  $("currentRange").textContent=currentRange;
+  $("tankRange").textContent=tankRange;
+  $("heroSub").textContent=`${detail} · ${fpl.toFixed(2)} L/lap`;
+
+  const notice=$("notice");
+  notice.className="notice";
+  if(recommended>tank+1e-9){
+    notice.className="notice bad";
+    notice.textContent=`⚠ Required ${recommended.toFixed(1)} L exceeds the ${tank.toFixed(1)} L tank by ${(recommended-tank).toFixed(1)} L. A stop, shorter stint or lower consumption is required.`;
+  } else if(current>tank+1e-9){
+    notice.className="notice warn";
+    notice.textContent=`Current fuel is above the entered tank capacity. Check the values before using the result.`;
+  } else if(current>=recommended){
+    notice.textContent=`✓ Current fuel already covers the recommended target by ${(current-recommended).toFixed(1)} L.`;
+  } else {
+    const pct=(recommended/tank)*100;
+    notice.textContent=`Load ${recommended.toFixed(1)} L total (${pct.toFixed(0)}% of tank). Add ${toAdd.toFixed(1)} L from the entered current fuel.`;
+  }
+  save();
+}
+
+function adjust(id,delta){
+  const e=$(id); e.value=Math.max(0,(Number(e.value)||0)+delta); calculate();
+}
+async function copyCall(){
+  calculate();
+  if($("recommended").textContent==="—") return;
+  const call=`FUEL: ${$("recommended").textContent} L total · ADD ${$("toAdd").textContent} L · ${$("expectedLaps").textContent} laps expected · ${num("fuelPerLap").toFixed(2)} L/lap · +${num("marginLaps")} lap margin`;
+  try{
+    await navigator.clipboard.writeText(call);
+    $("copyBtn").textContent="Copied ✓";
+    setTimeout(()=>$("copyBtn").textContent="Copy fuel call",1200);
+  }catch{
+    prompt("Copy fuel call:",call);
+  }
+}
+
+$("modeTime").addEventListener("click",()=>setMode("time"));
+$("modeLaps").addEventListener("click",()=>setMode("laps"));
+document.querySelectorAll("input").forEach(e=>e.addEventListener("input",calculate));
+document.querySelectorAll("[data-minutes]").forEach(b=>b.addEventListener("click",()=>adjust("minutes",Number(b.dataset.minutes))));
+document.querySelectorAll("[data-laps]").forEach(b=>b.addEventListener("click",()=>adjust("laps",Number(b.dataset.laps))));
+$("copyBtn").addEventListener("click",copyCall);
+$("resetBtn").addEventListener("click",reset);
+
+// Fix JS template typo safely before first run:
+load();
+calculate();
+</script>
+</body>
+</html>
