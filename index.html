@@ -12,11 +12,25 @@
 .clock{display:grid;grid-template-columns:1fr 1fr;gap:10px}.clock .field{min-width:0}.stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.stepper button{min-height:70px;border-radius:14px;border:2px solid #687786;background:#273847;color:white;font-size:1.27rem;font-weight:900;white-space:nowrap}.stepper button:active{background:#477397}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}.row>*{min-width:0}.muted{font-size:.82rem;color:var(--muted);line-height:1.4}.resetHalf,.copy{min-height:52px;width:100%;background:#29394b;color:#fff;border:2px solid #6c859b;border-radius:12px;font-weight:800;margin:10px 0 0}.copy{background:#a82525;border-color:#ff7973}.notice{border-radius:12px;padding:11px 12px;margin-top:10px;font-size:.88rem;line-height:1.4;background:#253343;color:#eaf2f9}.notice.bad{background:#522222;color:#ffe7e4;border:1px solid var(--red)}.notice.warn{background:#46361d;color:#ffe8ae;border:1px solid var(--amber)}
 details{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:0 16px;margin-bottom:12px}summary{cursor:pointer;font-weight:900;min-height:58px;display:flex;align-items:center;list-style:none}summary::-webkit-details-marker{display:none}summary:after{content:'⌄';margin-left:auto;font-size:1.3rem}.settings{padding:0 0 16px}.settings .row{margin-bottom:13px}.settings label{font-size:.8rem}.settings input{font-size:1.08rem;height:52px}.planner{border-color:#45617e}.plannerResult{font-size:2.3rem;font-weight:950;color:var(--blue);font-variant-numeric:tabular-nums;margin:8px 0}.footer{font-size:.75rem;color:var(--muted);text-align:center;padding:8px}.hidden{display:none!important}
 .wakeBtn{width:100%;min-height:64px;border:2px solid #6c859b;border-radius:14px;background:#29394b;color:#fff;font-size:1.13rem;font-weight:900}.wakeBtn.on{background:#165b39;border-color:var(--green)}.wakeStatus{min-height:1.5em;margin:9px 0 0;font-size:.86rem;color:var(--muted)}
+
+.profilePick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+select{width:100%;height:54px;background:#0e151d;border:2px solid var(--line);border-radius:12px;color:var(--text);font:inherit;font-size:1rem;padding:7px}
+select:disabled{opacity:.55}.profileLoad,.profileActions button{min-height:54px;border:2px solid #6c859b;border-radius:12px;background:#29394b;color:#fff;font-weight:850}.profileLoad{width:100%;margin-top:9px}
+.profileActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.profileActions button.danger{background:#542c2c;border-color:#a95d5d}
+.profileManage input[type=file]{display:none}
+.profileNote{margin-top:8px;min-height:1.2em}
 @media(max-width:370px){.stepper{gap:5px}.stepper button{font-size:1.02rem;min-height:66px;padding:0}.hero .value{font-size:3.1rem}}@media(min-width:620px){.clock{max-width:370px}}
 </style></head><body><main class="wrap">
-<header><h1>DACC <span>FUEL</span> ENGINEER</h1><span class="tag">V5 · DRIVER TOOL</span></header>
+<header><h1>DACC <span>FUEL</span> ENGINEER</h1><span class="tag">V7 · DRIVER TOOL</span></header>
 <section class="card" aria-label="Calculation mode"><div class="seg"><button id="modeTime" type="button" aria-pressed="true">⏱ TIME</button><button id="modeLaps" type="button" aria-pressed="false">🏁 LAPS</button></div></section>
 <section class="card" aria-label="Screen awake"><button id="wakeToggle" class="wakeBtn" type="button" aria-pressed="false">☀ Keep screen awake: OFF</button><div id="wakeStatus" class="wakeStatus" role="status">Tap before your stint to keep this screen visible.</div></section>
+
+<section class="card" aria-label="Car and track profiles">
+<div class="profilePick"><div><label for="profileCarSelect">Car</label><select id="profileCarSelect"><option value="">Choose car</option></select></div><div><label for="profileTrackSelect">Track</label><select id="profileTrackSelect" disabled><option value="">Choose track</option></select></div></div>
+<button id="loadProfile" class="profileLoad" type="button">Load saved setup</button>
+<div id="profileQuickStatus" class="muted profileNote" role="status">No saved setups yet. Add one under Manage setups below.</div>
+</section>
 <section class="card">
 <h2>Fuel to the finish</h2><p>Enter the race clock <strong>as you enter the pits</strong>.</p><div class="hero" aria-live="polite"><div class="label">FUEL TO LEAVE PITS WITH</div><div class="value"><span id="target">—</span><span class="unit"> L</span></div><div class="detail" id="pitDetail">Set the values below</div></div>
 <div id="pitTimeFields"><div class="clock"><div class="field"><label for="pitHours">Hours left (optional)</label><input id="pitHours" type="number" inputmode="numeric" min="0" step="1"></div><div class="field"><label for="pitMinutes">Minutes left</label><input id="pitMinutes" type="number" inputmode="decimal" min="0" max="59.9" step="0.1"></div></div>
@@ -32,6 +46,15 @@ details{border:1px solid var(--line);border-radius:16px;background:var(--card);p
 <div id="planLapFields" class="hidden"><label for="planLaps">Planned laps</label><input id="planLaps" type="number" inputmode="numeric" min="0" step="1"></div>
 <div class="muted" id="halfHint">The pit clock starts at half of this duration. Once adjusted, it stays where you set it.</div>
 <div class="plannerResult"><span id="planFuel">—</span> L</div><div id="planDetail" class="muted"></div><div id="planNotice" class="notice" role="status"></div></section>
+
+<details id="profilesManage"><summary>Manage car / track setups</summary><div class="settings">
+<p>Save fuel per lap, average lap and tank size from the current settings. Race clock, stop time, safety margin and fuel on board stay separate.</p>
+<div class="row"><div><label for="profileCar">Car</label><input id="profileCar" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Ferrari 296 GT3"></div><div><label for="profileTrack">Track</label><input id="profileTrack" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Red Bull Ring"></div></div>
+<div class="profileActions"><button id="saveProfile" type="button">Save current setup</button><button id="deleteProfile" type="button" class="danger">Delete selected</button><button id="exportProfiles" type="button">Export all (.json)</button><button id="importProfiles" type="button">Import (.json)</button></div>
+<input id="profileImportFile" type="file" accept=".json,application/json">
+<div id="profileMessage" class="muted profileNote" role="status"></div>
+<p>Saved setups live in this browser. Export a JSON file to back them up or share them with another driver.</p>
+</div></details>
 <details><summary>Fuel and lap settings</summary><div class="settings">
 <div class="row"><div><label for="fuelPerLap">Fuel per lap (L)</label><input id="fuelPerLap" type="number" inputmode="decimal" min="0.01" step="0.01"></div><div><label for="marginLaps">Safety margin (laps)</label><input id="marginLaps" type="number" inputmode="decimal" min="0" step="0.5"></div></div>
 <div class="row"><div><label for="lapMin">Average lap: minutes</label><input id="lapMin" type="number" inputmode="numeric" min="0" step="1"></div><div><label for="lapSec">Average lap: seconds</label><input id="lapSec" type="number" inputmode="decimal" min="0" max="59.999" step="0.1"></div></div>
@@ -109,6 +132,117 @@ async function toggleWake(){
 $('wakeToggle').addEventListener('click',toggleWake);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&wakeWanted)acquireWake();else if(document.visibilityState==='hidden'&&wakeWanted)wakeMessage('Paused; will resume when you return.')});
 if(!navigator.wakeLock||typeof navigator.wakeLock.request!=='function'||window.isSecureContext===false)wakeMessage('Screen awake is unavailable in this preview. Try the HTTPS GitHub Pages link.');
+
+const PROFILE_KEY='daccFuelProfilesV1';
+let profiles=[];
+const profileId=()=>Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+const profileKey=(car,track)=>car.trim().toLocaleLowerCase()+'|'+track.trim().toLocaleLowerCase();
+function cleanProfile(raw){
+  if(!raw||typeof raw!=='object')return null;
+  const car=typeof raw.car==='string'?raw.car.trim().slice(0,80):'';
+  const track=typeof raw.track==='string'?raw.track.trim().slice(0,80):'';
+  const fuelPerLap=Number(raw.fuelPerLap),lapMin=Number(raw.lapMin),lapSec=Number(raw.lapSec),tank=Number(raw.tank);
+  if(!car||!track||!Number.isFinite(fuelPerLap)||fuelPerLap<=0||!Number.isFinite(lapMin)||lapMin<0||!Number.isFinite(lapSec)||lapSec<0||lapSec>=60||lapMin*60+lapSec<=0||!Number.isFinite(tank)||tank<=0)return null;
+  return {id:typeof raw.id==='string'&&raw.id.length<80?raw.id:profileId(),car,track,fuelPerLap,lapMin,lapSec,tank};
+}
+function profileMessage(message){$('profileMessage').textContent=message}
+function readProfiles(){
+  try{const saved=JSON.parse(localStorage.getItem(PROFILE_KEY)||'[]');profiles=Array.isArray(saved)?saved.map(cleanProfile).filter(Boolean).slice(0,200):[]}
+  catch{profiles=[];profileMessage('Saved setups could not be read on this device.')}
+  renderProfiles();
+}
+function persistProfiles(next){
+  try{localStorage.setItem(PROFILE_KEY,JSON.stringify(next));profiles=next;return true}
+  catch{profileMessage('Could not save setups on this device. Export a backup if possible.');return false}
+}
+function appendOption(list,value,label){const option=document.createElement('option');option.value=value;option.textContent=label;list.append(option)}
+function renderTracks(preferred=''){
+  const list=$('profileTrackSelect'),car=$('profileCarSelect').value;
+  list.replaceChildren();appendOption(list,'','Choose track');
+  const matching=profiles.filter(p=>p.car.toLocaleLowerCase()===car.toLocaleLowerCase());
+  for(const p of matching)appendOption(list,p.id,p.track);
+  list.value=matching.some(p=>p.id===preferred)?preferred:'';
+  list.disabled=!car;
+}
+function renderProfiles(selected=''){
+  const chosen=profiles.find(p=>p.id===(selected||$('profileTrackSelect').value));
+  const previousCar=chosen?chosen.car:$('profileCarSelect').value;
+  profiles.sort((a,b)=>(a.car+' '+a.track).localeCompare(b.car+' '+b.track));
+  const cars=$('profileCarSelect');cars.replaceChildren();appendOption(cars,'','Choose car');
+  const carNames=new Map();for(const p of profiles)if(!carNames.has(p.car.toLocaleLowerCase()))carNames.set(p.car.toLocaleLowerCase(),p.car);
+  for(const car of carNames.values())appendOption(cars,car,car);
+  cars.value=carNames.get(previousCar.toLocaleLowerCase())||'';
+  renderTracks(chosen?chosen.id:'');
+  $('profileQuickStatus').textContent=profiles.length?profiles.length+' setup'+(profiles.length===1?'':'s')+' saved on this device. Choose a car and track, then tap Load.':'No saved setups yet. Add one under Manage setups below.';
+}
+function selectedProfile(){return profiles.find(p=>p.id===$('profileTrackSelect').value&&p.car.toLocaleLowerCase()===$('profileCarSelect').value.toLocaleLowerCase())}
+function loadProfile(){
+  const p=selectedProfile();if(!p){profileMessage('Choose a saved car / track setup first.');return}
+  for(const field of ['fuelPerLap','lapMin','lapSec','tank'])$(field).value=p[field];
+  $('profileCar').value=p.car;$('profileTrack').value=p.track;
+  calculate();profileMessage('Loaded '+p.car+' at '+p.track+'. Race clock and fuel on board stayed as entered.');
+  $('profileQuickStatus').textContent=p.car+' — '+p.track+' loaded.';
+}
+function saveProfile(){
+  const typedCar=$('profileCar').value.trim().slice(0,80),track=$('profileTrack').value.trim().slice(0,80);
+  const car=profiles.find(p=>p.car.toLocaleLowerCase()===typedCar.toLocaleLowerCase())?.car||typedCar;
+  const candidate=cleanProfile({car,track,fuelPerLap:readNumber('fuelPerLap',0.00001),lapMin:readNumber('lapMin'),lapSec:readNumber('lapSec'),tank:readNumber('tank',0.00001)});
+  if(!candidate){profileMessage('Enter car, track, positive fuel/lap, valid average lap and tank size.');return}
+  const existing=profiles.find(p=>profileKey(p.car,p.track)===profileKey(car,track));
+  if(existing&&!window.confirm('Replace the saved setup for '+existing.car+' at '+existing.track+'?'))return;
+  if(!existing&&profiles.length>=200){profileMessage('200 setups is the maximum. Delete an old setup first.');return}
+  const item={...candidate,id:existing?existing.id:candidate.id};
+  const next=existing?profiles.map(p=>p.id===existing.id?item:p):[...profiles,item];
+  if(!persistProfiles(next))return;
+  renderProfiles(item.id);profileMessage((existing?'Updated ':'Saved ')+car+' at '+track+'.');
+  $('profileQuickStatus').textContent=car+' — '+track+' saved. Tap Load to apply it.';
+}
+function deleteProfile(){
+  const p=selectedProfile();if(!p){profileMessage('Choose a saved setup to delete.');return}
+  if(!window.confirm('Delete the saved setup for '+p.car+' at '+p.track+'?'))return;
+  if(!persistProfiles(profiles.filter(x=>x.id!==p.id)))return;
+  renderProfiles();profileMessage('Deleted '+p.car+' at '+p.track+'. Current fuel settings were not changed.');
+}
+function exportProfiles(){
+  if(!profiles.length){profileMessage('Save a setup before exporting.');return}
+  const blob=new Blob([JSON.stringify({format:'dacc-fuel-profiles',version:1,profiles},null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='dacc-fuel-profiles.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  profileMessage('Exported '+profiles.length+' setup'+(profiles.length===1?'':'s')+'.');
+}
+async function importProfiles(event){
+  const file=event.target.files&&event.target.files[0];if(!file)return;
+  try{
+    if(file.size>1000000)throw new Error('File is too large.');
+    const data=JSON.parse(await file.text());
+    if(data.format!=='dacc-fuel-profiles'||data.version!==1||!Array.isArray(data.profiles)||data.profiles.length>200)throw new Error('This is not a DACC fuel profile export.');
+    const incoming=data.profiles.map(cleanProfile);
+    if(incoming.some(p=>!p))throw new Error('Some setups have missing or invalid data.');
+    const clashes=incoming.filter(p=>profiles.some(x=>profileKey(x.car,x.track)===profileKey(p.car,p.track))).length;
+    if(clashes&&!window.confirm('Import will replace '+clashes+' matching car / track setup'+(clashes===1?'':'s')+'. Continue?'))return;
+    const next=[...profiles];
+    for(const p of incoming){const index=next.findIndex(x=>profileKey(x.car,x.track)===profileKey(p.car,p.track));if(index>=0)next[index]={...p,id:next[index].id};else next.push({...p,id:profileId()})}
+    if(next.length>200)throw new Error('The combined setups exceed the 200-setup limit.');
+    if(!persistProfiles(next))return;
+    renderProfiles();profileMessage('Imported '+incoming.length+' setup'+(incoming.length===1?'':'s')+'.');
+  }catch(err){profileMessage(err.message||'Could not import that file.')}
+  finally{event.target.value=''}
+}
+$('profileCarSelect').addEventListener('change',()=>{
+  renderTracks();$('profileCar').value=$('profileCarSelect').value;$('profileTrack').value='';
+  $('profileQuickStatus').textContent=$('profileCarSelect').value?'Now choose a saved track for '+$('profileCarSelect').value+'.':'Choose a car and track, then tap Load.';
+});
+$('profileTrackSelect').addEventListener('change',()=>{
+  const p=selectedProfile();
+  if(p){$('profileCar').value=p.car;$('profileTrack').value=p.track}
+  $('profileQuickStatus').textContent=p?'Selected '+p.car+' — '+p.track+'. Tap Load to apply.':'Choose a saved track, then tap Load.';
+});
+$('loadProfile').addEventListener('click',loadProfile);
+$('saveProfile').addEventListener('click',saveProfile);
+$('deleteProfile').addEventListener('click',deleteProfile);
+$('exportProfiles').addEventListener('click',exportProfiles);
+$('importProfiles').addEventListener('click',()=>$('profileImportFile').click());
+$('profileImportFile').addEventListener('change',importProfiles);
+readProfiles();
 document.querySelectorAll('input').forEach(e=>e.addEventListener('input',()=>{if(['pitHours','pitMinutes','pitLaps'].includes(e.id))state.autoHalf=false;if(['planHours','planMinutes','planLaps'].includes(e.id)&&state.autoHalf){half();return}calculate()}));
 document.querySelectorAll('[data-time]').forEach(e=>e.addEventListener('click',()=>adjustTime(Number(e.dataset.time))));document.querySelectorAll('[data-laps]').forEach(e=>e.addEventListener('click',()=>adjustLaps(Number(e.dataset.laps))));$('modeTime').onclick=()=>setMode('time');$('modeLaps').onclick=()=>setMode('laps');$('resetHalf').onclick=half;$('copy').onclick=copyCall;$('resetAll').onclick=()=>{state={...DEFAULTS};for(const k of keys)$(k).value=state[k];setMode('time')};init();
 </script></body></html>
