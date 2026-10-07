@@ -22,7 +22,7 @@ select:disabled{opacity:.55}.profileLoad,.profileActions button{min-height:54px;
 .profileNote{margin-top:8px;min-height:1.2em}
 @media(max-width:370px){.stepper{gap:5px}.stepper button{font-size:1.02rem;min-height:66px;padding:0}.hero .value{font-size:3.1rem}}@media(min-width:620px){.clock{max-width:370px}}
 </style></head><body><main class="wrap">
-<header><h1>DACC <span>FUEL</span> ENGINEER</h1><span class="tag">V7 · DRIVER TOOL</span></header>
+<header><h1>DACC <span>FUEL</span> ENGINEER</h1><span class="tag">V8 · DRIVER TOOL</span></header>
 <section class="card" aria-label="Calculation mode"><div class="seg"><button id="modeTime" type="button" aria-pressed="true">⏱ TIME</button><button id="modeLaps" type="button" aria-pressed="false">🏁 LAPS</button></div></section>
 <section class="card" aria-label="Screen awake"><button id="wakeToggle" class="wakeBtn" type="button" aria-pressed="false">☀ Keep screen awake: OFF</button><div id="wakeStatus" class="wakeStatus" role="status">Tap before your stint to keep this screen visible.</div></section>
 
@@ -48,7 +48,7 @@ select:disabled{opacity:.55}.profileLoad,.profileActions button{min-height:54px;
 <div class="plannerResult"><span id="planFuel">—</span> L</div><div id="planDetail" class="muted"></div><div id="planNotice" class="notice" role="status"></div></section>
 
 <details id="profilesManage"><summary>Manage car / track setups</summary><div class="settings">
-<p>Save fuel per lap, average lap and tank size from the current settings. Race clock, stop time, safety margin and fuel on board stay separate.</p>
+<p>Save fuel per lap, average lap, tank size and safety margin from the current settings. Race clock, stop time and fuel on board stay separate.</p>
 <div class="row"><div><label for="profileCar">Car</label><input id="profileCar" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Ferrari 296 GT3"></div><div><label for="profileTrack">Track</label><input id="profileTrack" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Red Bull Ring"></div></div>
 <div class="profileActions"><button id="saveProfile" type="button">Save current setup</button><button id="deleteProfile" type="button" class="danger">Delete selected</button><button id="exportProfiles" type="button">Export all (.json)</button><button id="importProfiles" type="button">Import (.json)</button></div>
 <input id="profileImportFile" type="file" accept=".json,application/json">
@@ -142,8 +142,11 @@ function cleanProfile(raw){
   const car=typeof raw.car==='string'?raw.car.trim().slice(0,80):'';
   const track=typeof raw.track==='string'?raw.track.trim().slice(0,80):'';
   const fuelPerLap=Number(raw.fuelPerLap),lapMin=Number(raw.lapMin),lapSec=Number(raw.lapSec),tank=Number(raw.tank);
+  const hasMargin=Object.prototype.hasOwnProperty.call(raw,'marginLaps');
+  const marginLaps=hasMargin?Number(raw.marginLaps):undefined;
   if(!car||!track||!Number.isFinite(fuelPerLap)||fuelPerLap<=0||!Number.isFinite(lapMin)||lapMin<0||!Number.isFinite(lapSec)||lapSec<0||lapSec>=60||lapMin*60+lapSec<=0||!Number.isFinite(tank)||tank<=0)return null;
-  return {id:typeof raw.id==='string'&&raw.id.length<80?raw.id:profileId(),car,track,fuelPerLap,lapMin,lapSec,tank};
+  if(hasMargin&&(raw.marginLaps===''||raw.marginLaps===null||!Number.isFinite(marginLaps)||marginLaps<0))return null;
+  return {id:typeof raw.id==='string'&&raw.id.length<80?raw.id:profileId(),car,track,fuelPerLap,lapMin,lapSec,tank,...(hasMargin?{marginLaps}:{})};
 }
 function profileMessage(message){$('profileMessage').textContent=message}
 function readProfiles(){
@@ -179,15 +182,16 @@ function selectedProfile(){return profiles.find(p=>p.id===$('profileTrackSelect'
 function loadProfile(){
   const p=selectedProfile();if(!p){profileMessage('Choose a saved car / track setup first.');return}
   for(const field of ['fuelPerLap','lapMin','lapSec','tank'])$(field).value=p[field];
+  if(Number.isFinite(p.marginLaps))$('marginLaps').value=p.marginLaps;
   $('profileCar').value=p.car;$('profileTrack').value=p.track;
-  calculate();profileMessage('Loaded '+p.car+' at '+p.track+'. Race clock and fuel on board stayed as entered.');
+  calculate();profileMessage('Loaded '+p.car+' at '+p.track+'. '+(Number.isFinite(p.marginLaps)?'Safety margin restored.':'This older setup has no saved safety margin; the current value was kept.')+' Race clock and fuel on board stayed as entered.');
   $('profileQuickStatus').textContent=p.car+' — '+p.track+' loaded.';
 }
 function saveProfile(){
   const typedCar=$('profileCar').value.trim().slice(0,80),track=$('profileTrack').value.trim().slice(0,80);
   const car=profiles.find(p=>p.car.toLocaleLowerCase()===typedCar.toLocaleLowerCase())?.car||typedCar;
-  const candidate=cleanProfile({car,track,fuelPerLap:readNumber('fuelPerLap',0.00001),lapMin:readNumber('lapMin'),lapSec:readNumber('lapSec'),tank:readNumber('tank',0.00001)});
-  if(!candidate){profileMessage('Enter car, track, positive fuel/lap, valid average lap and tank size.');return}
+  const candidate=cleanProfile({car,track,fuelPerLap:readNumber('fuelPerLap',0.00001),lapMin:readNumber('lapMin'),lapSec:readNumber('lapSec'),tank:readNumber('tank',0.00001),marginLaps:readNumber('marginLaps')});
+  if(!candidate){profileMessage('Enter car, track, positive fuel/lap, valid average lap and tank size, and a nonnegative safety margin.');return}
   const existing=profiles.find(p=>profileKey(p.car,p.track)===profileKey(car,track));
   if(existing&&!window.confirm('Replace the saved setup for '+existing.car+' at '+existing.track+'?'))return;
   if(!existing&&profiles.length>=200){profileMessage('200 setups is the maximum. Delete an old setup first.');return}
