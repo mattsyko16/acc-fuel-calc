@@ -32,14 +32,24 @@ select:disabled{opacity:.55}.profileLoad,.profileActions button{min-height:54px;
 
 .formationCheck{display:flex;align-items:center;gap:12px;min-height:56px;font-size:1.05rem;color:var(--text);cursor:pointer}
 .formationCheck input{width:28px;height:28px;min-height:28px;padding:0;flex:none;accent-color:#e24c43}
+
+.strategyMetrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.strategyMetrics .hero{margin:0;min-width:0}
+.strategyMetrics .strategyTarget{font-size:2.2rem}
+@media(max-width:559px){.strategyMetrics{grid-template-columns:1fr}}
 @media(max-width:370px){.stepper{gap:5px}.stepper button{font-size:1.02rem;min-height:66px;padding:0}.hero .value{font-size:3.1rem}}@media(min-width:620px){.clock{max-width:370px}}
 </style></head><body><main class="wrap">
-<header><h1>DACC <span>FUEL</span> ENGINEER</h1><span class="tag">V11 · DRIVER TOOL</span></header>
+<header><h1>DACC <span>FUEL</span> ENGINEER</h1><span class="tag">V12 · DRIVER TOOL</span></header>
 <nav class="pageTabs" role="tablist" aria-label="Fuel calculator pages">
 <button id="pitTab" type="button" role="tab" aria-selected="true" aria-controls="pitPage">Pit stop</button>
 <button id="planTab" type="button" role="tab" aria-selected="false" aria-controls="planPage" tabindex="-1">Race / stint</button>
 <button id="strategyTab" type="button" role="tab" aria-selected="false" aria-controls="strategyPage" tabindex="-1">Strategy</button>
 </nav>
+<section id="strategyMetrics" class="strategyMetrics hidden" aria-label="Key strategy targets">
+<div class="hero" aria-live="polite"><div class="label">NO-STOP FUEL TARGET</div><div class="strategyTarget">≤ <span id="strategyTarget">—</span> <span style="font-size:1rem">L / lap</span></div><div id="strategyFuelDetail" class="detail">Enter the race and fuel values.</div></div>
+<div class="hero" aria-live="polite"><div class="label">MAXIMUM AVERAGE PACE LOSS FOR NO STOP</div><div class="strategyTarget" style="font-size:2rem" id="strategyPaceAllowance">—</div><div class="detail" id="strategyPaceTarget">Enter pit loss to see the lap-time ceiling.</div></div>
+</section>
+
 <section id="calcMode" class="card" aria-label="Calculation mode"><div class="seg"><button id="modeTime" type="button" aria-pressed="true">⏱ TIME</button><button id="modeLaps" type="button" aria-pressed="false">🏁 LAPS</button></div></section>
 <section class="card" aria-label="Screen awake"><button id="wakeToggle" class="wakeBtn" type="button" aria-pressed="false">☀ Keep screen awake: OFF</button><div id="wakeStatus" class="wakeStatus" role="status">Tap before your stint to keep this screen visible.</div></section>
 
@@ -83,7 +93,6 @@ select:disabled{opacity:.55}.profileLoad,.profileActions button{min-height:54px;
 <div class="row"><div><label for="strategyStartFuel">Starting fuel available (L)</label><input data-strategy id="strategyStartFuel" type="number" inputmode="decimal" min="0.1" step="0.1"></div><div><label for="strategyTank">Tank capacity (L)</label><input data-strategy id="strategyTank" type="number" inputmode="decimal" min="0.1" step="1"></div></div>
 <div class="row"><div><label for="strategyNormalFuel">Normal fuel per lap (L)</label><input data-strategy id="strategyNormalFuel" type="number" inputmode="decimal" min="0.01" step="0.01"></div><div><label for="strategyMargin">Fuel reserve (laps)</label><input data-strategy id="strategyMargin" type="number" inputmode="decimal" min="0" step="0.5"></div></div>
 </div>
-<div class="hero" aria-live="polite"><div class="label">NO-STOP FUEL TARGET</div><div class="strategyTarget">≤ <span id="strategyTarget">—</span> <span style="font-size:1rem">L / lap</span></div><div id="strategyFuelDetail" class="detail">Enter the race and fuel values.</div></div>
 <div class="strategyFields">
 <div class="row"><div><label for="strategyPenalty">No-stop average pace loss (s/lap)</label><input data-strategy id="strategyPenalty" type="number" inputmode="decimal" min="0" step="0.1"></div><div><label for="strategyMeasured">Achievable saving fuel / lap (optional)</label><input data-strategy id="strategyMeasured" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="Measured L/lap"></div></div>
 <p class="muted">Use the average pace loss over the full run, including fuel saving and known tyre fade. Enter consumption from the same test, or leave it blank for a conditional comparison.</p>
@@ -92,7 +101,6 @@ select:disabled{opacity:.55}.profileLoad,.profileActions button{min-height:54px;
 </div>
 
 <div class="strategyFields"><div class="row"><div><label for="strategyAdvantage">Minimum no-stop advantage (seconds)</label><input data-strategy id="strategyAdvantage" type="number" inputmode="decimal" min="0" step="1"></div><div class="muted">Default: 15 seconds ahead to make the longer tyre stint worthwhile. This is a decision buffer, not an automatic tyre-wear prediction.</div></div></div>
-<div class="hero" aria-live="polite"><div class="label">MAXIMUM AVERAGE PACE LOSS FOR NO STOP</div><div class="strategyTarget" style="font-size:2rem" id="strategyPaceAllowance">—</div><div class="detail" id="strategyPaceTarget">Enter pit loss to see the lap-time ceiling.</div></div>
 <div id="strategyWinner" class="notice strategyWinner" role="status"></div>
 <table class="strategyTable"><thead><tr><th scope="col">Same distance</th><th scope="col">No stop</th><th scope="col">Fuel stops</th></tr></thead><tbody>
 <tr><th scope="row">Estimated laps</th><td id="strategyNoStopLaps">—</td><td id="strategyStopLaps">—</td></tr>
@@ -422,6 +430,7 @@ function showPage(page){
     const active=name===page;$(name+'Page').classList.toggle('hidden',!active);
     $(name+'Tab').setAttribute('aria-selected',String(active));$(name+'Tab').tabIndex=active?0:-1;
   }
+  $('strategyMetrics').classList.toggle('hidden',page!=='strategy');
   $('calcMode').classList.toggle('hidden',page==='strategy');
   $('formationSettings').classList.toggle('hidden',page==='pit');
   try{localStorage.setItem('daccFuelPage',page)}catch{}
