@@ -34,7 +34,7 @@ select:disabled{opacity:.55}.profileLoad,.profileActions button{min-height:54px;
 .formationCheck input{width:28px;height:28px;min-height:28px;padding:0;flex:none;accent-color:#e24c43}
 @media(max-width:370px){.stepper{gap:5px}.stepper button{font-size:1.02rem;min-height:66px;padding:0}.hero .value{font-size:3.1rem}}@media(min-width:620px){.clock{max-width:370px}}
 </style></head><body><main class="wrap">
-<header><h1>DACC <span>FUEL</span> ENGINEER</h1><span class="tag">V10 · DRIVER TOOL</span></header>
+<header><h1>DACC <span>FUEL</span> ENGINEER</h1><span class="tag">V11 · DRIVER TOOL</span></header>
 <nav class="pageTabs" role="tablist" aria-label="Fuel calculator pages">
 <button id="pitTab" type="button" role="tab" aria-selected="true" aria-controls="pitPage">Pit stop</button>
 <button id="planTab" type="button" role="tab" aria-selected="false" aria-controls="planPage" tabindex="-1">Race / stint</button>
@@ -85,11 +85,14 @@ select:disabled{opacity:.55}.profileLoad,.profileActions button{min-height:54px;
 </div>
 <div class="hero" aria-live="polite"><div class="label">NO-STOP FUEL TARGET</div><div class="strategyTarget">≤ <span id="strategyTarget">—</span> <span style="font-size:1rem">L / lap</span></div><div id="strategyFuelDetail" class="detail">Enter the race and fuel values.</div></div>
 <div class="strategyFields">
-<div class="row"><div><label for="strategyPenalty">Fuel saving: seconds lost / lap</label><input data-strategy id="strategyPenalty" type="number" inputmode="decimal" min="0" step="0.1"></div><div><label for="strategyMeasured">Achievable saving fuel / lap (optional)</label><input data-strategy id="strategyMeasured" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="Measured L/lap"></div></div>
-<p class="muted">Enter the pace penalty and consumption from the same fuel-saving test. Leave consumption blank for a conditional comparison.</p>
+<div class="row"><div><label for="strategyPenalty">No-stop average pace loss (s/lap)</label><input data-strategy id="strategyPenalty" type="number" inputmode="decimal" min="0" step="0.1"></div><div><label for="strategyMeasured">Achievable saving fuel / lap (optional)</label><input data-strategy id="strategyMeasured" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="Measured L/lap"></div></div>
+<p class="muted">Use the average pace loss over the full run, including fuel saving and known tyre fade. Enter consumption from the same test, or leave it blank for a conditional comparison.</p>
 <div class="row"><div><label for="strategyStops">Number of fuel stops</label><input data-strategy id="strategyStops" type="number" inputmode="numeric" min="1" step="1"></div><div><label for="strategyPitLoss">Total time lost per stop (seconds)</label><input data-strategy id="strategyPitLoss" type="number" inputmode="decimal" min="0" step="1" placeholder="Enter total pit loss"></div></div>
 <p class="muted">Pit loss is the total race-time cost versus staying out: lane loss, refuelling and any service. Count each part once; include refuelling time for the amount shown below.</p>
 </div>
+
+<div class="strategyFields"><div class="row"><div><label for="strategyAdvantage">Minimum no-stop advantage (seconds)</label><input data-strategy id="strategyAdvantage" type="number" inputmode="decimal" min="0" step="1"></div><div class="muted">Default: 15 seconds ahead to make the longer tyre stint worthwhile. This is a decision buffer, not an automatic tyre-wear prediction.</div></div></div>
+<div class="hero" aria-live="polite"><div class="label">MAXIMUM AVERAGE PACE LOSS FOR NO STOP</div><div class="strategyTarget" style="font-size:2rem" id="strategyPaceAllowance">—</div><div class="detail" id="strategyPaceTarget">Enter pit loss to see the lap-time ceiling.</div></div>
 <div id="strategyWinner" class="notice strategyWinner" role="status"></div>
 <table class="strategyTable"><thead><tr><th scope="col">Same distance</th><th scope="col">No stop</th><th scope="col">Fuel stops</th></tr></thead><tbody>
 <tr><th scope="row">Estimated laps</th><td id="strategyNoStopLaps">—</td><td id="strategyStopLaps">—</td></tr>
@@ -311,7 +314,7 @@ readProfiles();
 document.querySelectorAll('input:not([data-strategy]):not([data-formation])').forEach(e=>e.addEventListener('input',()=>{if(['pitHours','pitMinutes','pitLaps'].includes(e.id))state.autoHalf=false;if(['planHours','planMinutes','planLaps'].includes(e.id)&&state.autoHalf){half();return}calculate()}));
 document.querySelectorAll('[data-time]').forEach(e=>e.addEventListener('click',()=>adjustTime(Number(e.dataset.time))));document.querySelectorAll('[data-laps]').forEach(e=>e.addEventListener('click',()=>adjustLaps(Number(e.dataset.laps))));$('modeTime').onclick=()=>setMode('time');$('modeLaps').onclick=()=>setMode('laps');$('resetHalf').onclick=half;$('copy').onclick=copyCall;$('resetAll').onclick=()=>{state={...DEFAULTS};for(const k of keys)$(k).value=state[k];restoreFormationInputs();setMode('time');calculateStrategy()};init();
 
-const STRATEGY_FIELDS=['strategyRaceHours','strategyRaceMinutes','strategyLapMin','strategyLapSec','strategyStartFuel','strategyTank','strategyNormalFuel','strategyMargin','strategyPenalty','strategyMeasured','strategyStops','strategyPitLoss'];
+const STRATEGY_FIELDS=['strategyRaceHours','strategyRaceMinutes','strategyLapMin','strategyLapSec','strategyStartFuel','strategyTank','strategyNormalFuel','strategyMargin','strategyPenalty','strategyMeasured','strategyStops','strategyPitLoss','strategyAdvantage'];
 function strategyDuration(seconds){
   if(!Number.isFinite(seconds))return '—';
   const tenths=Math.round(seconds*10),h=Math.floor(tenths/36000),m=Math.floor(tenths%36000/600),sec=(tenths%600/10).toFixed(1).padStart(4,'0');
@@ -319,6 +322,8 @@ function strategyDuration(seconds){
 }
 // Compare a fixed, shared lap count; never reward a strategy for covering less distance.
 function computeStrategy(d){
+  const minimumAdvantage=d.minimumAdvantage??15;
+  if(!Number.isFinite(minimumAdvantage)||minimumAdvantage<0)return null;
   if(!Number.isFinite(d.duration)||d.duration<=0||!Number.isFinite(d.lap)||d.lap<=0||!Number.isFinite(d.start)||d.start<=0||!Number.isFinite(d.tank)||d.tank<=0||d.start>d.tank||!Number.isFinite(d.fpl)||d.fpl<=0||!Number.isFinite(d.reserve)||d.reserve<0||!Number.isFinite(d.penalty)||d.penalty<0||!Number.isInteger(d.stops)||d.stops<1||d.measured!==null&&(!Number.isFinite(d.measured)||d.measured<=0)||d.pitLoss!==null&&(!Number.isFinite(d.pitLoss)||d.pitLoss<0))return null;
   const laps=Math.ceil((d.duration-1e-9)/d.lap);
   const factor=d.formationFactor??0;if(![0,0.25,1].includes(factor))return null;
@@ -332,27 +337,34 @@ function computeStrategy(d){
   const savingLap=d.lap+d.penalty,noStopTime=laps*savingLap;
   const pitTotal=d.pitLoss===null?null:d.stops*d.pitLoss;
   const stopTime=pitTotal===null?null:laps*d.lap+pitTotal;
-  return {laps,targetRaw,target,formationFuel,normalFuel,refuel,minimumStops,savingLap,noStopTime,stopTime,pitTotal,
+  const difference=stopTime===null?null:stopTime-noStopTime;
+  return {minimumAdvantage,paceAllowance:pitTotal===null?null:(pitTotal-minimumAdvantage)/laps,meetsAdvantage:difference!==null&&difference>=minimumAdvantage-1e-9,laps,targetRaw,target,formationFuel,normalFuel,refuel,minimumStops,savingLap,noStopTime,stopTime,pitTotal,
     savingLitres:Math.max(0,d.fpl-target),savingPct:Math.max(0,(d.fpl-target)/d.fpl*100),
     noStopFits:d.measured===null?null:(laps+d.reserve)*d.measured+formationFuel<=d.start+1e-9,
     stopsFit:minimumStops<=d.stops,
     breakEven:pitTotal===null?null:pitTotal/laps,
-    difference:stopTime===null?null:stopTime-noStopTime};
+    difference};
 }
 function readStrategy(){
   const optionalZero=id=>$(id).value.trim()===''?0:readNumber(id);
   return {formationFactor:formationFactor(),duration:$('strategyRaceHours').value.trim()===''&&$('strategyRaceMinutes').value.trim()===''?NaN:(optionalZero('strategyRaceHours')*60+optionalZero('strategyRaceMinutes'))*60,
     lap:optionalZero('strategyLapMin')*60+optionalZero('strategyLapSec'),
     start:readNumber('strategyStartFuel'),tank:readNumber('strategyTank'),fpl:readNumber('strategyNormalFuel'),
-    reserve:readNumber('strategyMargin'),penalty:readNumber('strategyPenalty'),stops:readNumber('strategyStops'),
+    reserve:readNumber('strategyMargin'),penalty:readNumber('strategyPenalty'),stops:readNumber('strategyStops'),minimumAdvantage:readNumber('strategyAdvantage'),
     pitLoss:$('strategyPitLoss').value.trim()===''?null:readNumber('strategyPitLoss'),
     measured:$('strategyMeasured').value.trim()===''?null:readNumber('strategyMeasured')};
+}
+function strategyPaceDuration(seconds){
+  if(!Number.isFinite(seconds)||seconds<=0)return 'unachievable';
+  const hundredths=Math.floor((seconds+1e-9)*100),h=Math.floor(hundredths/360000),m=Math.floor(hundredths%360000/6000),sec=(hundredths%6000/100).toFixed(2).padStart(5,'0');
+  return (h?h+':':'')+String(m).padStart(h?2:1,'0')+':'+sec;
 }
 function calculateStrategy(){
   const d=readStrategy(),r=computeStrategy(d);
   try{const saved={};for(const id of STRATEGY_FIELDS)saved[id]=$(id).value;localStorage.setItem('daccFuelStrategyV1',JSON.stringify(saved))}catch{}
   if(!r||readNumber('strategyLapSec')>=60){
-    for(const id of ['strategyTarget','strategyNoStopLaps','strategyStopLaps','strategySavingLap','strategyNormalLap','strategyNoStopTime','strategyStopTime','strategyRefuel'])$(id).textContent='—';
+    for(const id of ['strategyTarget','strategyNoStopLaps','strategyStopLaps','strategySavingLap','strategyNormalLap','strategyNoStopTime','strategyStopTime','strategyRefuel','strategyPaceAllowance'])$(id).textContent='—';
+    $('strategyPaceTarget').textContent='Check race and minimum-advantage inputs.';
     $('strategyFuelDetail').textContent='Check duration, lap time and fuel values. Starting fuel must cover formation fuel and cannot exceed tank capacity.';
     notice('strategyWinner','Enter valid race, fuel, pace and stop values.','bad');notice('strategyBreakEven','');notice('strategyFeasibility','');return;
   }
@@ -362,14 +374,24 @@ function calculateStrategy(){
   $('strategySavingLap').textContent=strategyDuration(r.savingLap);$('strategyNormalLap').textContent=strategyDuration(d.lap);
   $('strategyNoStopTime').textContent=strategyDuration(r.noStopTime);$('strategyStopTime').textContent=strategyDuration(r.stopTime);
   $('strategyRefuel').textContent=r.refuel+' L total';
+  if(r.paceAllowance===null){$('strategyPaceAllowance').textContent='—';$('strategyPaceTarget').textContent='Enter total pit loss to calculate this target.'}
+  else if(r.paceAllowance<0){
+    $('strategyPaceAllowance').textContent='No pace loss affordable';
+    $('strategyPaceTarget').textContent='Need '+(Math.ceil((-r.paceAllowance-1e-9)*100)/100).toFixed(2)+' s/lap faster than normal to gain '+r.minimumAdvantage+' seconds. Required average: '+strategyPaceDuration(d.lap+r.paceAllowance)+'.';
+  }else{
+    $('strategyPaceAllowance').textContent='≤ +'+(Math.floor((r.paceAllowance+1e-9)*100)/100).toFixed(2)+' s / lap';
+    $('strategyPaceTarget').textContent='Average '+strategyPaceDuration(d.lap+r.paceAllowance)+' or quicker to finish at least '+r.minimumAdvantage+' seconds ahead. Allowance = ('+r.pitTotal.toFixed(1)+' s pit loss − '+r.minimumAdvantage+' s buffer) ÷ '+r.laps+' laps. Pace ceiling rounded down.';
+  }
   const condition=r.noStopFits===null?' if you can achieve the no-stop fuel target at this pace':'';
   if(r.noStopFits===false&&r.stopsFit)notice('strategyWinner','Refuelling is required at the entered consumption: the no-stop run exceeds available fuel.','warn');
   else if(!r.stopsFit&&r.noStopFits===false)notice('strategyWinner','Neither plan fits the fuel budget. Add stops or achieve lower consumption.','bad');
   else if(!r.stopsFit)notice('strategyWinner',r.noStopFits?'No stop fits the fuel budget; the selected fuel-stop plan needs more stops.':'The selected fuel-stop plan cannot carry enough fuel. No stop fits only if the target is achievable.','warn');
   else if(r.difference===null)notice('strategyWinner','Enter the total time lost per stop to compare race times.','warn');
-  else if(Math.abs(r.difference)<0.05)notice('strategyWinner','Both plans take the same estimated time'+condition+'.');
-  else notice('strategyWinner',(r.difference>0?'No stop is faster by ':'Refuelling is faster by ')+Math.abs(r.difference).toFixed(1)+' seconds'+condition+'.');
-  notice('strategyBreakEven',r.breakEven===null?'Break-even pace will appear when pit loss is entered.':'Break-even: fuel saving can cost up to '+r.breakEven.toFixed(2)+' seconds per lap ('+strategyDuration(d.lap+r.breakEven)+' average lap) before refuelling becomes faster. Total pit loss: '+r.pitTotal.toFixed(1)+' seconds.');
+  else if(r.meetsAdvantage)notice('strategyWinner','No stop preferred: '+r.difference.toFixed(1)+' seconds ahead, meeting the '+r.minimumAdvantage+'-second minimum'+condition+'.');
+  else if(r.difference>0)notice('strategyWinner','Refuel preferred: no stop gains only '+r.difference.toFixed(1)+' seconds'+condition+', below the '+r.minimumAdvantage+'-second minimum.','warn');
+  else if(Math.abs(r.difference)<0.05)notice('strategyWinner','Refuel preferred: both plans take the same estimated time and do not meet the '+r.minimumAdvantage+'-second no-stop advantage.','warn');
+  else notice('strategyWinner','Refuelling is faster by '+Math.abs(r.difference).toFixed(1)+' seconds'+condition+'.');
+  notice('strategyBreakEven',r.breakEven===null?'Break-even pace will appear when pit loss is entered.':'Raw break-even, before the '+r.minimumAdvantage+'-second buffer: pace loss can be up to '+r.breakEven.toFixed(2)+' seconds per lap ('+strategyDuration(d.lap+r.breakEven)+' average lap) before refuelling becomes faster. Total pit loss: '+r.pitTotal.toFixed(1)+' seconds.');
   let fuelCheck=r.noStopFits===null?'No-stop consumption is untested: achieve ≤ '+r.target.toFixed(2)+' L/lap.':r.noStopFits?'The entered saving consumption fits the starting fuel, including reserve'+(r.formationFuel>0?' and formation':'')+'.':'The entered saving consumption is too high for a no-stop run.';
   fuelCheck+=' Normal pace needs '+r.normalFuel+' L total, including reserve'+(r.formationFuel>0?' and formation':'')+'; at least '+r.minimumStops+' fuel stop'+(r.minimumStops===1?'':'s')+' by tank capacity.';
   if(r.refuel===0)fuelCheck+=' Normal pace already fits the starting fuel; a fuel stop is unnecessary.';
@@ -387,7 +409,7 @@ function useStrategySettings(){
   calculateStrategy();
 }
 function initStrategy(){
-  $('strategyPenalty').value=0;$('strategyStops').value=1;
+  $('strategyPenalty').value=0;$('strategyStops').value=1;$('strategyAdvantage').value=15;
   let saved=null;try{saved=JSON.parse(localStorage.getItem('daccFuelStrategyV1')||'null')}catch{}
   if(saved&&typeof saved==='object'){for(const id of STRATEGY_FIELDS)if(Object.prototype.hasOwnProperty.call(saved,id)&&typeof saved[id]!=='object')$(id).value=saved[id];calculateStrategy()}
   else useStrategySettings();
