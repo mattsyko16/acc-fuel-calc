@@ -29,9 +29,12 @@ select:disabled{opacity:.55}.profileLoad,.profileActions button{min-height:54px;
 .strategyTable{width:100%;border-collapse:collapse;margin-top:12px;font-size:.85rem}
 .strategyTable th,.strategyTable td{text-align:left;padding:10px 5px;border-bottom:1px solid var(--line);vertical-align:top}
 .strategyTable th{color:var(--muted)}.strategyWinner{font-size:1.05rem;font-weight:800}
+
+.formationCheck{display:flex;align-items:center;gap:12px;min-height:56px;font-size:1.05rem;color:var(--text);cursor:pointer}
+.formationCheck input{width:28px;height:28px;min-height:28px;padding:0;flex:none;accent-color:#e24c43}
 @media(max-width:370px){.stepper{gap:5px}.stepper button{font-size:1.02rem;min-height:66px;padding:0}.hero .value{font-size:3.1rem}}@media(min-width:620px){.clock{max-width:370px}}
 </style></head><body><main class="wrap">
-<header><h1>DACC <span>FUEL</span> ENGINEER</h1><span class="tag">V9 · DRIVER TOOL</span></header>
+<header><h1>DACC <span>FUEL</span> ENGINEER</h1><span class="tag">V10 · DRIVER TOOL</span></header>
 <nav class="pageTabs" role="tablist" aria-label="Fuel calculator pages">
 <button id="pitTab" type="button" role="tab" aria-selected="true" aria-controls="pitPage">Pit stop</button>
 <button id="planTab" type="button" role="tab" aria-selected="false" aria-controls="planPage" tabindex="-1">Race / stint</button>
@@ -47,6 +50,12 @@ select:disabled{opacity:.55}.profileLoad,.profileActions button{min-height:54px;
 </section>
 
 
+
+<section id="formationSettings" class="card hidden" aria-label="Formation lap allowance">
+<label for="formationLap" class="formationCheck"><input id="formationLap" data-formation type="checkbox"> Include formation lap fuel</label>
+<label for="formationType">Formation length</label><select id="formationType" disabled><option value="full">Full lap — 100% of normal racing-lap fuel</option><option value="short">Short lap — 25% of normal racing-lap fuel</option></select>
+<p class="muted" style="margin-top:8px">Fuel is used before the race clock starts. This allowance applies to the race / stint start and strategy comparison.</p>
+</section>
 <section id="pitPage" class="card" role="tabpanel" aria-labelledby="pitTab">
 <h2>Fuel to the finish</h2><p>Enter the race clock <strong>as you enter the pits</strong>.</p><div class="hero" aria-live="polite"><div class="label">FUEL TO LEAVE PITS WITH</div><div class="value"><span id="target">—</span><span class="unit"> L</span></div><div class="detail" id="pitDetail">Set the values below</div></div>
 <div id="pitTimeFields"><div class="clock"><div class="field"><label for="pitHours">Hours left (optional)</label><input id="pitHours" type="number" inputmode="numeric" min="0" step="1"></div><div class="field"><label for="pitMinutes">Minutes left</label><input id="pitMinutes" type="number" inputmode="decimal" min="0" max="59.9" step="0.1"></div></div>
@@ -94,7 +103,7 @@ select:disabled{opacity:.55}.profileLoad,.profileActions button{min-height:54px;
 </section>
 
 <details id="profilesManage"><summary>Manage car / track setups</summary><div class="settings">
-<p>Save fuel per lap, average lap, tank size and safety margin from the current settings. Race clock, stop time and fuel on board stay separate.</p>
+<p>Save fuel per lap, average lap, tank size, safety margin and formation-lap choice from the current settings. Race clock, stop time and fuel on board stay separate.</p>
 <div class="row"><div><label for="profileCar">Car</label><input id="profileCar" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Ferrari 296 GT3"></div><div><label for="profileTrack">Track</label><input id="profileTrack" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Red Bull Ring"></div></div>
 <div class="profileActions"><button id="saveProfile" type="button">Save current setup</button><button id="deleteProfile" type="button" class="danger">Delete selected</button><button id="exportProfiles" type="button">Export all (.json)</button><button id="importProfiles" type="button">Import (.json)</button></div>
 <input id="profileImportFile" type="file" accept=".json,application/json">
@@ -108,28 +117,31 @@ select:disabled{opacity:.55}.profileLoad,.profileActions button{min-height:54px;
 <p>Target includes the safety laps. “Fuel to add” uses the fuel still on board at pit entry. Time mode rounds expected laps up to a whole lap.</p><button id="resetAll" class="resetHalf" type="button">Reset pit / stint defaults</button></div></details>
 <div class="footer">Runs offline in your browser · Values saved on this device · Check the race clock and consumption before using a fuel call</div></main>
 <script>
-const DEFAULTS={version:2,mode:'time',planHours:2,planMinutes:0,planLaps:80,pitHours:1,pitMinutes:0,pitLaps:40,stopSeconds:0,lapMin:1,lapSec:30,fuelPerLap:2.24,marginLaps:2,currentFuel:0,tank:120,autoHalf:true};
-let state={...DEFAULTS};const $=id=>document.getElementById(id);const keys=Object.keys(DEFAULTS).filter(k=>!['mode','version','autoHalf'].includes(k));
+const DEFAULTS={version:2,mode:'time',planHours:2,planMinutes:0,planLaps:80,pitHours:1,pitMinutes:0,pitLaps:40,stopSeconds:0,lapMin:1,lapSec:30,fuelPerLap:2.24,marginLaps:2,currentFuel:0,tank:120,autoHalf:true,formationLap:false,formationType:'full'};
+let state={...DEFAULTS};const $=id=>document.getElementById(id);const keys=Object.keys(DEFAULTS).filter(k=>!['mode','version','autoHalf','formationLap','formationType'].includes(k));
 const ceilL=n=>Math.ceil(n-1e-9),fmt=n=>Number.isFinite(n)?n.toFixed(1):'—',fmtFuel=n=>Number.isFinite(n)?String(n):'—';
 function time(h,m){return Number(h)*60+Number(m)}
 function setClock(prefix,total){const t=Math.max(0,total);$(prefix+'Hours').value=Math.floor(t/60);$(prefix+'Minutes').value=Number((t%60).toFixed(3))}
 function half(){if(state.mode==='laps')$('pitLaps').value=Math.ceil(Number($('planLaps').value)/2);else setClock('pit',time($('planHours').value,$('planMinutes').value)/2);state.autoHalf=true;calculate()}
+function formationFactor(){return $('formationLap').checked?($('formationType').value==='short'?0.25:1):0}
+function syncFormationInputs(){state.formationLap=$('formationLap').checked;state.formationType=$('formationType').value==='short'?'short':'full';$('formationType').disabled=!state.formationLap}
+function restoreFormationInputs(){$('formationLap').checked=state.formationLap===true;$('formationType').value=state.formationType==='short'?'short':'full';syncFormationInputs()}
 function save(){try{localStorage.setItem('daccFuelCalc',JSON.stringify(state))}catch{}}
 function init(){try{const old=JSON.parse(localStorage.getItem('daccFuelCalc')||'null');if(old&&typeof old==='object'){
 if(old.version===2)state={...DEFAULTS,...old};else{state={...DEFAULTS,mode:old.mode==='laps'?'laps':'time'};for(const k of ['lapMin','lapSec','fuelPerLap','marginLaps','currentFuel','tank'])if(Number.isFinite(Number(old[k])))state[k]=Number(old[k]);
 if(Number.isFinite(Number(old.pitLoss)))state.stopSeconds=Number(old.pitLoss);if(Number.isFinite(Number(old.laps))){state.pitLaps=Number(old.laps);state.planLaps=2*Number(old.laps)}}}
-}catch{}for(const k of keys)$(k).value=state[k];setMode(state.mode,false)}
+}catch{}for(const k of keys)$(k).value=state[k];restoreFormationInputs();setMode(state.mode,false)}
 function setMode(mode,update=true){state.mode=mode==='laps'?'laps':'time';for(const [id,on] of [['modeTime',state.mode==='time'],['modeLaps',state.mode==='laps']]){$(id).classList.toggle('active',on);$(id).setAttribute('aria-pressed',String(on))}for(const id of ['pitTimeFields','planTimeFields'])$(id).classList.toggle('hidden',state.mode!=='time');for(const id of ['pitLapFields','planLapFields'])$(id).classList.toggle('hidden',state.mode!=='laps');if(update&&state.autoHalf)half();else calculate()}
 function readNumber(id,minimum=0){const v=$(id).value.trim();if(v===''||!Number.isFinite(Number(v))||Number(v)<minimum)return NaN;return Number(v)}
 function readTime(prefix){const rawHours=$(prefix+'Hours').value.trim(),rawMinutes=$(prefix+'Minutes').value.trim();if(rawHours===''&&rawMinutes==='')return NaN;const h=rawHours===''?0:readNumber(prefix+'Hours'),m=rawMinutes===''?0:readNumber(prefix+'Minutes');return m>=60?NaN:time(h,m)}
 function notice(id,message,level=''){const e=$(id);e.textContent=message;e.className='notice'+(level?' '+level:'')}
-function calculate(){for(const k of keys)state[k]=$(k).value;const fpl=readNumber('fuelPerLap',0.00001),margin=readNumber('marginLaps'),tank=readNumber('tank',0.00001),current=readNumber('currentFuel'),lapSeconds=readNumber('lapMin')*60+readNumber('lapSec');const stop=readNumber('stopSeconds');const isTime=state.mode==='time';const pitInput=isTime?readTime('pit'):readNumber('pitLaps');const planInput=isTime?readTime('plan'):readNumber('planLaps');
+function calculate(){syncFormationInputs();for(const k of keys)state[k]=$(k).value;const fpl=readNumber('fuelPerLap',0.00001),margin=readNumber('marginLaps'),tank=readNumber('tank',0.00001),current=readNumber('currentFuel'),lapSeconds=readNumber('lapMin')*60+readNumber('lapSec');const stop=readNumber('stopSeconds');const isTime=state.mode==='time';const pitInput=isTime?readTime('pit'):readNumber('pitLaps');const planInput=isTime?readTime('plan'):readNumber('planLaps');
 const validBase=Number.isFinite(fpl)&&Number.isFinite(margin)&&Number.isFinite(tank)&&Number.isFinite(current)&&current<=tank&&(!isTime||Number.isFinite(lapSeconds)&&lapSeconds>0&&Number.isFinite(stop));
 const pitValid=validBase&&Number.isFinite(pitInput);const planValid=validBase&&Number.isFinite(planInput);
 if(pitValid){const usable=isTime?Math.max(0,pitInput*60-stop):pitInput;const laps=isTime?Math.ceil((usable-1e-9)/lapSeconds):Math.ceil(pitInput);const target=ceilL((laps+margin)*fpl);const add=ceilL(Math.max(0,target-current));$('target').textContent=fmtFuel(target);$('add').textContent=fmtFuel(add);$('pitDetail').textContent=isTime?laps+' estimated laps · '+fmt(usable/60)+' min after stop · +'+margin+' safety laps':laps+' laps remaining · +'+margin+' safety laps';
 if(target>tank+1e-9)notice('pitNotice','Target exceeds the '+fmt(tank)+' L tank by '+fmtFuel(ceilL(target-tank))+' L. Another stop or fuel saving is required.','bad');else if(isTime&&stop>=pitInput*60&&pitInput>0)notice('pitNotice','The entered stop time uses all remaining race time. Check the clock and stop time.','warn');else notice('pitNotice','Leave with '+fmtFuel(target)+' L total. With '+fmt(current)+' L on board, add '+fmtFuel(add)+' L.');
 }else{$('target').textContent='—';$('add').textContent='—';$('pitDetail').textContent='Check the inputs';notice('pitNotice','Enter valid values for time/laps, fuel, lap time, current fuel and tank.','bad')}
-if(planValid){const laps=isTime?Math.ceil((planInput*60-1e-9)/lapSeconds):Math.ceil(planInput);const fuel=ceilL((laps+margin)*fpl);$('planFuel').textContent=fmtFuel(fuel);$('planDetail').textContent=laps+' estimated laps × '+fpl.toFixed(2)+' L/lap + '+margin+' safety laps';notice('planNotice',fuel>tank+1e-9?'More than one tank ('+fmt(tank)+' L). Plan refuelling stops.':'Fits in one '+fmt(tank)+' L tank.',fuel>tank+1e-9?'warn':'')
+if(planValid){const laps=isTime?Math.ceil((planInput*60-1e-9)/lapSeconds):Math.ceil(planInput);const formationFuel=formationFactor()*fpl;const fuel=ceilL((laps+margin)*fpl+formationFuel);$('planFuel').textContent=fmtFuel(fuel);$('planDetail').textContent=laps+' estimated laps × '+fpl.toFixed(2)+' L/lap + '+margin+' safety laps'+(formationFuel>0?' + '+formationFuel.toFixed(2)+' L formation fuel':'');notice('planNotice',fuel>tank+1e-9?'More than one tank ('+fmt(tank)+' L). Plan refuelling stops.':'Fits in one '+fmt(tank)+' L tank.',fuel>tank+1e-9?'warn':'')
 }else{$('planFuel').textContent='—';$('planDetail').textContent='';notice('planNotice','Check planned duration and fuel settings.','bad')}save()}
 function adjustTime(delta){const v=readTime('pit');setClock('pit',Math.max(0,(Number.isFinite(v)?v:0)+delta));state.autoHalf=false;calculate()}
 function adjustLaps(delta){const v=readNumber('pitLaps');$('pitLaps').value=Math.max(0,Math.ceil(Number.isFinite(v)?v:0)+delta);state.autoHalf=false;calculate()}
@@ -192,7 +204,9 @@ function cleanProfile(raw){
   const marginLaps=hasMargin?Number(raw.marginLaps):undefined;
   if(!car||!track||!Number.isFinite(fuelPerLap)||fuelPerLap<=0||!Number.isFinite(lapMin)||lapMin<0||!Number.isFinite(lapSec)||lapSec<0||lapSec>=60||lapMin*60+lapSec<=0||!Number.isFinite(tank)||tank<=0)return null;
   if(hasMargin&&(raw.marginLaps===''||raw.marginLaps===null||!Number.isFinite(marginLaps)||marginLaps<0))return null;
-  return {id:typeof raw.id==='string'&&raw.id.length<80?raw.id:profileId(),car,track,fuelPerLap,lapMin,lapSec,tank,...(hasMargin?{marginLaps}:{})};
+  const hasFormation=Object.prototype.hasOwnProperty.call(raw,'formationLap');
+  if(hasFormation&&(typeof raw.formationLap!=='boolean'||!['full','short'].includes(raw.formationType)))return null;
+  return {id:typeof raw.id==='string'&&raw.id.length<80?raw.id:profileId(),car,track,fuelPerLap,lapMin,lapSec,tank,...(hasMargin?{marginLaps}:{}),...(hasFormation?{formationLap:raw.formationLap,formationType:raw.formationType}:{})};
 }
 function profileMessage(message){$('profileMessage').textContent=message}
 function readProfiles(){
@@ -229,6 +243,7 @@ function loadProfile(){
   const p=selectedProfile();if(!p){profileMessage('Choose a saved car / track setup first.');return}
   for(const field of ['fuelPerLap','lapMin','lapSec','tank'])$(field).value=p[field];
   if(Number.isFinite(p.marginLaps))$('marginLaps').value=p.marginLaps;
+  if(typeof p.formationLap==='boolean'){$('formationLap').checked=p.formationLap;$('formationType').value=p.formationType}
   $('profileCar').value=p.car;$('profileTrack').value=p.track;
   calculate();profileMessage('Loaded '+p.car+' at '+p.track+'. '+(Number.isFinite(p.marginLaps)?'Safety margin restored.':'This older setup has no saved safety margin; the current value was kept.')+' Race clock and fuel on board stayed as entered.');
   $('profileQuickStatus').textContent=p.car+' — '+p.track+' loaded.';applyStrategyCarSettings();
@@ -236,7 +251,7 @@ function loadProfile(){
 function saveProfile(){
   const typedCar=$('profileCar').value.trim().slice(0,80),track=$('profileTrack').value.trim().slice(0,80);
   const car=profiles.find(p=>p.car.toLocaleLowerCase()===typedCar.toLocaleLowerCase())?.car||typedCar;
-  const candidate=cleanProfile({car,track,fuelPerLap:readNumber('fuelPerLap',0.00001),lapMin:readNumber('lapMin'),lapSec:readNumber('lapSec'),tank:readNumber('tank',0.00001),marginLaps:readNumber('marginLaps')});
+  const candidate=cleanProfile({car,track,fuelPerLap:readNumber('fuelPerLap',0.00001),lapMin:readNumber('lapMin'),lapSec:readNumber('lapSec'),tank:readNumber('tank',0.00001),marginLaps:readNumber('marginLaps'),formationLap:$('formationLap').checked,formationType:$('formationType').value});
   if(!candidate){profileMessage('Enter car, track, positive fuel/lap, valid average lap and tank size, and a nonnegative safety margin.');return}
   const existing=profiles.find(p=>profileKey(p.car,p.track)===profileKey(car,track));
   if(existing&&!window.confirm('Replace the saved setup for '+existing.car+' at '+existing.track+'?'))return;
@@ -293,8 +308,8 @@ $('exportProfiles').addEventListener('click',exportProfiles);
 $('importProfiles').addEventListener('click',()=>$('profileImportFile').click());
 $('profileImportFile').addEventListener('change',importProfiles);
 readProfiles();
-document.querySelectorAll('input:not([data-strategy])').forEach(e=>e.addEventListener('input',()=>{if(['pitHours','pitMinutes','pitLaps'].includes(e.id))state.autoHalf=false;if(['planHours','planMinutes','planLaps'].includes(e.id)&&state.autoHalf){half();return}calculate()}));
-document.querySelectorAll('[data-time]').forEach(e=>e.addEventListener('click',()=>adjustTime(Number(e.dataset.time))));document.querySelectorAll('[data-laps]').forEach(e=>e.addEventListener('click',()=>adjustLaps(Number(e.dataset.laps))));$('modeTime').onclick=()=>setMode('time');$('modeLaps').onclick=()=>setMode('laps');$('resetHalf').onclick=half;$('copy').onclick=copyCall;$('resetAll').onclick=()=>{state={...DEFAULTS};for(const k of keys)$(k).value=state[k];setMode('time')};init();
+document.querySelectorAll('input:not([data-strategy]):not([data-formation])').forEach(e=>e.addEventListener('input',()=>{if(['pitHours','pitMinutes','pitLaps'].includes(e.id))state.autoHalf=false;if(['planHours','planMinutes','planLaps'].includes(e.id)&&state.autoHalf){half();return}calculate()}));
+document.querySelectorAll('[data-time]').forEach(e=>e.addEventListener('click',()=>adjustTime(Number(e.dataset.time))));document.querySelectorAll('[data-laps]').forEach(e=>e.addEventListener('click',()=>adjustLaps(Number(e.dataset.laps))));$('modeTime').onclick=()=>setMode('time');$('modeLaps').onclick=()=>setMode('laps');$('resetHalf').onclick=half;$('copy').onclick=copyCall;$('resetAll').onclick=()=>{state={...DEFAULTS};for(const k of keys)$(k).value=state[k];restoreFormationInputs();setMode('time');calculateStrategy()};init();
 
 const STRATEGY_FIELDS=['strategyRaceHours','strategyRaceMinutes','strategyLapMin','strategyLapSec','strategyStartFuel','strategyTank','strategyNormalFuel','strategyMargin','strategyPenalty','strategyMeasured','strategyStops','strategyPitLoss'];
 function strategyDuration(seconds){
@@ -306,24 +321,27 @@ function strategyDuration(seconds){
 function computeStrategy(d){
   if(!Number.isFinite(d.duration)||d.duration<=0||!Number.isFinite(d.lap)||d.lap<=0||!Number.isFinite(d.start)||d.start<=0||!Number.isFinite(d.tank)||d.tank<=0||d.start>d.tank||!Number.isFinite(d.fpl)||d.fpl<=0||!Number.isFinite(d.reserve)||d.reserve<0||!Number.isFinite(d.penalty)||d.penalty<0||!Number.isInteger(d.stops)||d.stops<1||d.measured!==null&&(!Number.isFinite(d.measured)||d.measured<=0)||d.pitLoss!==null&&(!Number.isFinite(d.pitLoss)||d.pitLoss<0))return null;
   const laps=Math.ceil((d.duration-1e-9)/d.lap);
-  const targetRaw=d.start/(laps+d.reserve);
+  const factor=d.formationFactor??0;if(![0,0.25,1].includes(factor))return null;
+  const formationFuel=factor*d.fpl;
+  if(d.start<=formationFuel)return null;
+  const targetRaw=(d.start-formationFuel)/(laps+d.reserve);
   const target=Math.floor((targetRaw+1e-9)*100)/100;
-  const normalFuel=ceilL((laps+d.reserve)*d.fpl);
+  const normalFuel=ceilL((laps+d.reserve)*d.fpl+formationFuel);
   const refuel=ceilL(Math.max(0,normalFuel-d.start));
   const minimumStops=Math.max(0,Math.ceil((normalFuel-d.start-1e-9)/d.tank));
   const savingLap=d.lap+d.penalty,noStopTime=laps*savingLap;
   const pitTotal=d.pitLoss===null?null:d.stops*d.pitLoss;
   const stopTime=pitTotal===null?null:laps*d.lap+pitTotal;
-  return {laps,targetRaw,target,normalFuel,refuel,minimumStops,savingLap,noStopTime,stopTime,pitTotal,
+  return {laps,targetRaw,target,formationFuel,normalFuel,refuel,minimumStops,savingLap,noStopTime,stopTime,pitTotal,
     savingLitres:Math.max(0,d.fpl-target),savingPct:Math.max(0,(d.fpl-target)/d.fpl*100),
-    noStopFits:d.measured===null?null:(laps+d.reserve)*d.measured<=d.start+1e-9,
+    noStopFits:d.measured===null?null:(laps+d.reserve)*d.measured+formationFuel<=d.start+1e-9,
     stopsFit:minimumStops<=d.stops,
     breakEven:pitTotal===null?null:pitTotal/laps,
     difference:stopTime===null?null:stopTime-noStopTime};
 }
 function readStrategy(){
   const optionalZero=id=>$(id).value.trim()===''?0:readNumber(id);
-  return {duration:$('strategyRaceHours').value.trim()===''&&$('strategyRaceMinutes').value.trim()===''?NaN:(optionalZero('strategyRaceHours')*60+optionalZero('strategyRaceMinutes'))*60,
+  return {formationFactor:formationFactor(),duration:$('strategyRaceHours').value.trim()===''&&$('strategyRaceMinutes').value.trim()===''?NaN:(optionalZero('strategyRaceHours')*60+optionalZero('strategyRaceMinutes'))*60,
     lap:optionalZero('strategyLapMin')*60+optionalZero('strategyLapSec'),
     start:readNumber('strategyStartFuel'),tank:readNumber('strategyTank'),fpl:readNumber('strategyNormalFuel'),
     reserve:readNumber('strategyMargin'),penalty:readNumber('strategyPenalty'),stops:readNumber('strategyStops'),
@@ -335,11 +353,11 @@ function calculateStrategy(){
   try{const saved={};for(const id of STRATEGY_FIELDS)saved[id]=$(id).value;localStorage.setItem('daccFuelStrategyV1',JSON.stringify(saved))}catch{}
   if(!r||readNumber('strategyLapSec')>=60){
     for(const id of ['strategyTarget','strategyNoStopLaps','strategyStopLaps','strategySavingLap','strategyNormalLap','strategyNoStopTime','strategyStopTime','strategyRefuel'])$(id).textContent='—';
-    $('strategyFuelDetail').textContent='Check duration, lap time and fuel values. Starting fuel cannot exceed tank capacity.';
+    $('strategyFuelDetail').textContent='Check duration, lap time and fuel values. Starting fuel must cover formation fuel and cannot exceed tank capacity.';
     notice('strategyWinner','Enter valid race, fuel, pace and stop values.','bad');notice('strategyBreakEven','');notice('strategyFeasibility','');return;
   }
   $('strategyTarget').textContent=r.target.toFixed(2);
-  $('strategyFuelDetail').textContent=r.laps+' race laps + '+d.reserve+' reserve laps. Save '+r.savingLitres.toFixed(2)+' L/lap ('+r.savingPct.toFixed(1)+'%) versus normal pace. Target rounded down to 0.01 L/lap.';
+  $('strategyFuelDetail').textContent=r.laps+' race laps + '+d.reserve+' reserve laps. Save '+r.savingLitres.toFixed(2)+' L/lap ('+r.savingPct.toFixed(1)+'%) versus normal pace. Target rounded down to 0.01 L/lap.'+(r.formationFuel>0?' '+r.formationFuel.toFixed(2)+' L allowed for formation at normal race consumption.':'');
   $('strategyNoStopLaps').textContent=r.laps;$('strategyStopLaps').textContent=r.laps;
   $('strategySavingLap').textContent=strategyDuration(r.savingLap);$('strategyNormalLap').textContent=strategyDuration(d.lap);
   $('strategyNoStopTime').textContent=strategyDuration(r.noStopTime);$('strategyStopTime').textContent=strategyDuration(r.stopTime);
@@ -352,8 +370,8 @@ function calculateStrategy(){
   else if(Math.abs(r.difference)<0.05)notice('strategyWinner','Both plans take the same estimated time'+condition+'.');
   else notice('strategyWinner',(r.difference>0?'No stop is faster by ':'Refuelling is faster by ')+Math.abs(r.difference).toFixed(1)+' seconds'+condition+'.');
   notice('strategyBreakEven',r.breakEven===null?'Break-even pace will appear when pit loss is entered.':'Break-even: fuel saving can cost up to '+r.breakEven.toFixed(2)+' seconds per lap ('+strategyDuration(d.lap+r.breakEven)+' average lap) before refuelling becomes faster. Total pit loss: '+r.pitTotal.toFixed(1)+' seconds.');
-  let fuelCheck=r.noStopFits===null?'No-stop consumption is untested: achieve ≤ '+r.target.toFixed(2)+' L/lap.':r.noStopFits?'The entered saving consumption fits the starting fuel, including reserve.':'The entered saving consumption is too high for a no-stop run.';
-  fuelCheck+=' Normal pace needs '+r.normalFuel+' L total, including reserve; at least '+r.minimumStops+' fuel stop'+(r.minimumStops===1?'':'s')+' by tank capacity.';
+  let fuelCheck=r.noStopFits===null?'No-stop consumption is untested: achieve ≤ '+r.target.toFixed(2)+' L/lap.':r.noStopFits?'The entered saving consumption fits the starting fuel, including reserve'+(r.formationFuel>0?' and formation':'')+'.':'The entered saving consumption is too high for a no-stop run.';
+  fuelCheck+=' Normal pace needs '+r.normalFuel+' L total, including reserve'+(r.formationFuel>0?' and formation':'')+'; at least '+r.minimumStops+' fuel stop'+(r.minimumStops===1?'':'s')+' by tank capacity.';
   if(r.refuel===0)fuelCheck+=' Normal pace already fits the starting fuel; a fuel stop is unnecessary.';
   notice('strategyFeasibility',fuelCheck,!r.stopsFit||r.noStopFits===false?'warn':'');
 }
@@ -383,6 +401,7 @@ function showPage(page){
     $(name+'Tab').setAttribute('aria-selected',String(active));$(name+'Tab').tabIndex=active?0:-1;
   }
   $('calcMode').classList.toggle('hidden',page==='strategy');
+  $('formationSettings').classList.toggle('hidden',page==='pit');
   try{localStorage.setItem('daccFuelPage',page)}catch{}
 }
 for(const [index,name] of ['pit','plan','strategy'].entries()){
@@ -393,5 +412,7 @@ for(const [index,name] of ['pit','plan','strategy'].entries()){
     event.preventDefault();showPage(next);$(next+'Tab').focus();
   });
 }
+$('formationLap').addEventListener('change',()=>{calculate();calculateStrategy()});
+$('formationType').addEventListener('change',()=>{calculate();calculateStrategy()});
 initStrategy();let initialPage='pit';try{initialPage=localStorage.getItem('daccFuelPage')||'pit'}catch{}showPage(initialPage);
 </script></body></html>
